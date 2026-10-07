@@ -1,0 +1,22 @@
+enum Role {
+  ADMIN
+  COLABORADOR
+}
+
+enum Status {
+  ATIVO
+  INATIVO
+}
+
+model User {
+  userId    Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String?
+  password  String // Armazenar sempre o hash da senha (ex: bcrypt)
+  role      Role     @default(COLABORADOR)
+  status    Status   @default(ATIVO)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
