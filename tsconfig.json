@@ -8,6 +8,36 @@
     "skipLibCheck": true,
     "rootDir": ".",
     "outDir": "./build",
+    "baseUrl": "./src",
+    "paths": {
+      "@controllers/*": [
+        "./controllers/*"
+      ],
+      "@database/*": [
+        "./database/*"
+      ],
+      "@middlewares/*": [
+        "./middlewares/*"
+      ],
+      "@repositories/*": [
+        "./repositories/*"
+      ],
+      "@routes/*": [
+        "./routes/*"
+      ],
+      "@schemas/*": [
+        "./schemas/*"
+      ],
+      "@services/*": [
+        "./services/*"
+      ],
+      "@utils/*": [
+        "./utils/*"
+      ],
+      "@types/*": [
+        "./types/*"
+      ]
+    },
     "types": [
       "node"
     ],
