@@ -58,8 +58,8 @@ export class AuthService {
       };
       const newAccessToken = jwt.sign(newPayload, authEnv.JWT_SECRET, { expiresIn: authEnv.JWT_EXPIRES_IN });
 
-      //Gera o token de refresh
-      const newRefreshToken = jwt.sign(payload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
+      //Gera um novo token de refresh
+      const newRefreshToken = jwt.sign(newPayload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
 
       await prisma.user.update({
         where: { userId: user.userId },
