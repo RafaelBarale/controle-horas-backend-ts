@@ -1,7 +1,7 @@
-﻿import { UserRepository } from '../repositories/UserRepository';
+﻿import { UserRepository } from '@repositories/UserRepository';
 import type { Prisma, User } from '@prisma/client';
 import bcrypt from "bcryptjs";
-import { AppError } from '../utils/AppError';
+import { AppError } from '@utils/AppError';
 
 export class UserService {
   private userRepository = new UserRepository();

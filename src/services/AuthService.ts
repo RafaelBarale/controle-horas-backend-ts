@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { UserRepository } from '@repositories/UserRepository';
 import { authEnv } from '@schemas/auth.schema';
 import { AppError } from '@utils/AppError';
+import { prisma } from '@database/prisma';
 
 export class AuthService {
   constructor(private userRepo = new UserRepository()) { }
@@ -30,6 +31,11 @@ export class AuthService {
     //Gera o token de refresh
     const refreshToken = jwt.sign(payload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
 
+    await prisma.user.update({
+        where: { userId: user.userId },
+        data: { refreshToken: refreshToken }
+      });
+
     return { accessToken, refreshToken };
   }
 
@@ -51,8 +57,16 @@ export class AuthService {
         role: user.role
       };
       const newAccessToken = jwt.sign(newPayload, authEnv.JWT_SECRET, { expiresIn: authEnv.JWT_EXPIRES_IN });
+
+      //Gera o token de refresh
+      const newRefreshToken = jwt.sign(payload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
+
+      await prisma.user.update({
+        where: { userId: user.userId },
+        data: { refreshToken: newRefreshToken }
+      });
       
-      return { accessToken: newAccessToken };
+      return { accessToken: newAccessToken, refreshToken: newRefreshToken };
       
     }catch(err){
       if(err instanceof AppError) throw err;
