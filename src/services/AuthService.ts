@@ -36,7 +36,7 @@ export class AuthService {
         data: { refreshToken: refreshToken }
       });
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken, tokenType: 'Bearer' };
   }
 
   async refreshToken(refreshToken: string){

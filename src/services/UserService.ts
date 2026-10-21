@@ -1,4 +1,5 @@
 ﻿import { UserRepository } from '@repositories/UserRepository';
+import type { UserSummary } from '@repositories/UserRepository';
 import type { Prisma, User } from '@prisma/client';
 import bcrypt from "bcryptjs";
 import { AppError } from '@utils/AppError';
@@ -19,7 +20,7 @@ export class UserService {
     return this.userRepository.create(data);
   }
 
-  async getAllUsers(): Promise<User[]> {
+  async getAllUsers(): Promise<UserSummary[]> {
     return this.userRepository.findAll();
   }
 }

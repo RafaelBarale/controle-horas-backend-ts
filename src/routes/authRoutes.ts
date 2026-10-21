@@ -2,6 +2,7 @@
 import { Router } from 'express';
 import { validateBodyLogin } from '@middlewares/validateBodyLogin';
 import { login, refresh } from '@controllers/AuthController';
+import { validateBodyRefresh } from '@middlewares/validateBodyRefresh';
 
 const authRoutes = Router();
 
@@ -9,6 +10,6 @@ const authRoutes = Router();
 authRoutes.post('/login', validateBodyLogin, login);
 
 //rota de refresh token
-authRoutes.post('/refresh', refresh);
+authRoutes.post('/refresh', validateBodyRefresh, refresh);
 
 export default authRoutes;

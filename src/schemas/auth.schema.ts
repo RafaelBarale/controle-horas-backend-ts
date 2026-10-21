@@ -18,3 +18,12 @@ export const authSchema = z.object({
 });
 
 export const authEnv = authSchema.parse(process.env);
+
+export const refreshTokenSchema = z.object({
+  params: z.object({
+    id: z.string().uuid('ID do usuário inválido!'),
+  }),
+  body: z.object({
+    refreshToken: z.string().min(1, 'Refresh token inválido!'),
+  })
+});
