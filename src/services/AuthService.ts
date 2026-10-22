@@ -8,6 +8,8 @@ import { prisma } from '@database/prisma';
 
 export class AuthService {
   constructor(private userRepo = new UserRepository()) { }
+
+  //login
   async login(email: string, password: string) {
     //valida se o usuario exite e a senha confere
     const user = await this.userRepo.findByEmail(email);
@@ -38,6 +40,31 @@ export class AuthService {
 
     return { accessToken, refreshToken, tokenType: 'Bearer' };
   }
+
+
+  async logout(authorization: string){
+    try{
+      //Valida o token
+      const token = authorization.split(' ')[1];
+      const payload = jwt.verify(token, authEnv.JWT_SECRET) as jwt.JwtPayload;
+      //Verifica se o usuario ainda existe
+      const user = await this.userRepo.findByEmail(payload.email);
+      if(!user){
+        throw new AppError('User not found', 401);
+      }
+      //Remove o token
+      await prisma.user.update({
+        where: { userId: user.userId },
+        data: { refreshToken: null }
+      });
+      
+      return { message: 'User logged out successfully' };
+    }catch(err){
+      if(err instanceof AppError) throw err;
+      throw new AppError('Invalid or expired token', 401);
+    }
+  }
+
 
   async refreshToken(refreshToken: string){
     try{
