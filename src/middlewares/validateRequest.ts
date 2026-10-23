@@ -9,20 +9,20 @@ type RequestValidationSchema = z.ZodType<{
 }>;
 
 // 2. Restringimos o genérico <T> para herdar dessa nossa estrutura base
-export const validateRequest = <T extends RequestValidationSchema>(schema: T): RequestHandler => 
+export const validateRequest = <T extends RequestValidationSchema>(schema: T): RequestHandler =>
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Agora o TS sabe que 'validated' obrigatoriamente contém body, query e/params se fornecidos
-      const validated = await schema.parseAsync({
+      const validated = schema.parse({
         body: req.body,
         query: req.query,
         params: req.params,
       });
 
       // O erro 'Property body does not exist' desaparece completamente!
-      if ('body' in validated) req.body = validated.body;
-      if ('query' in validated) req.query = validated.query;
-      if ('params' in validated) req.params = validated.params;
+      if ('body' in validated) Object.assign(req.body, validated.body);
+      if ('query' in validated) Object.assign(req.query, validated.query);
+      if ('params' in validated) Object.assign(req.params, validated.params);
 
       next();
     } catch (error) {

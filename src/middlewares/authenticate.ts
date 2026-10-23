@@ -16,7 +16,8 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction) =
     req.user = {
       id: payload.userId,
       email: payload.email,
-      role: payload.role
+      role: payload.role,
+      name: payload.name,
     };
     next();
   } catch (err) {

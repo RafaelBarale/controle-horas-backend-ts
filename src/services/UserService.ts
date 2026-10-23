@@ -1,13 +1,13 @@
 ﻿import { UserRepository } from '@repositories/UserRepository';
 import type { UserSummary } from '@repositories/UserRepository';
-import type { Prisma, User } from '@prisma/client';
+import type { Prisma } from '@database/prisma';
 import bcrypt from "bcryptjs";
 import { AppError } from '@utils/AppError';
 
 export class UserService {
   private userRepository = new UserRepository();
 
-  async registerUser(data: Prisma.UserCreateInput): Promise<User> {
+  async registerUser(data: Prisma.UserCreateInput): Promise<UserSummary> {
     const userExists = await this.userRepository.findByEmail(data.email);
     
     if (userExists) {
@@ -22,5 +22,30 @@ export class UserService {
 
   async getAllUsers(): Promise<UserSummary[]> {
     return this.userRepository.findAll();
+  }
+
+  async updateUser(userId: number, data: Prisma.UserUpdateInput): Promise<UserSummary> {
+
+    const userExists = await this.userRepository.findById(userId);
+
+    if(!userExists) {
+      throw new AppError('Usuário não encontrado.', 404);
+    }
+
+    return this.userRepository.update(userId, data);
+  }
+
+  async getByID(userId: number): Promise<UserSummary> {
+    const user = await this.userRepository.findById(userId);
+
+    if(!user) {
+      throw new AppError('Usuário não encontrado.', 404);
+    }
+
+    return user;
+  }
+
+  async delete(userId: number): Promise<UserSummary> {
+    return this.userRepository.delete(userId);
   }
 }
