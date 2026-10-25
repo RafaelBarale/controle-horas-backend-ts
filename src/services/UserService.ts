@@ -3,6 +3,7 @@ import type { UserSummary } from '@repositories/UserRepository';
 import type { Prisma } from '@database/prisma';
 import bcrypt from "bcryptjs";
 import { AppError } from '@utils/AppError';
+import type { UpdateUserBody } from '@schemas/user.schema';
 
 export class UserService {
   private userRepository = new UserRepository();
@@ -24,12 +25,21 @@ export class UserService {
     return this.userRepository.findAll();
   }
 
-  async updateUser(userId: number, data: Prisma.UserUpdateInput): Promise<UserSummary> {
+  async updateUser(userId: number, data: UpdateUserBody): Promise<UserSummary> {
 
     const userExists = await this.userRepository.findById(userId);
 
     if(!userExists) {
       throw new AppError('Usuário não encontrado.', 404);
+    }
+
+    // Verifica se o email foi alterado e se o novo email ja existe
+    if(data.email && String(data.email) !== userExists.email) {
+      const emailExists = await this.userRepository.findByEmail(data.email);
+      
+      if (emailExists) {
+        throw new AppError('Este e-mail ja esta em uso.', 400); // 400 Bad Request
+      }
     }
 
     return this.userRepository.update(userId, data);

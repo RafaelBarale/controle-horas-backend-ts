@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const getByIdParamsSchema = z.object({
-  userId: z.coerce.number({ message: 'O ID deve ser um número' }).
+  id: z.coerce.number({ message: 'O ID deve ser um número' }).
     int({ message: 'O ID deve ser um número inteiro' }).
     positive({ message: 'O ID deve ser maior que 0' })
 });

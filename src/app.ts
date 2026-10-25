@@ -5,6 +5,7 @@ import userRoutes from '@routes/userRoutes';
 import { errorHandler } from '@middlewares/errorHandler';
 import { authenticate } from '@middlewares/authenticate';
 import authRoutes from '@routes/authRoutes';
+import clientRoutes from '@routes/clientRoutes';
 
 const app = express();
 
@@ -18,11 +19,15 @@ app.get('/', (_req, res) => {
         message: 'OK'
     });
 });
-//Rotas de autenticação
+
+// Rotas de autenticação
 app.use('/auth', authRoutes);
 
-//Rotas de usuários
+// Rotas de usuários
 app.use('/users', authenticate, userRoutes);
+
+// Rotas de clientes
+app.use('/clients', authenticate, clientRoutes);
 
 // Middleware de Erro Global (Sempre deve ser o ltimo app.use)
 app.use(errorHandler);

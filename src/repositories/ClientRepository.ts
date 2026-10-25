@@ -6,6 +6,7 @@ const clientSummaryArgs = {
     name: true,
     email: true,
     status: true,
+    ein: true
   },
 } satisfies Prisma.ClientFindManyArgs;
 
@@ -16,7 +17,26 @@ export class ClientRepository {
     return prisma.client.create({ data });
   }
 
+  async findByEin(ein: string): Promise<Client | null> {
+    return prisma.client.findUnique({ where: { ein } });
+  }
+
   async findAll(): Promise<ClientSummary[]> {
     return prisma.client.findMany(clientSummaryArgs);
+  }
+
+  async findById(clientId: number): Promise<ClientSummary | null> {
+    return prisma.client.findUnique({
+      where: { clientId },
+      ...clientSummaryArgs
+    });
+  }
+
+  async update(clientId: number, data: Prisma.ClientUpdateInput): Promise<ClientSummary> {
+    return prisma.client.update({ where: { clientId }, data, ...clientSummaryArgs });
+  }
+
+  async delete(clientId: number): Promise<ClientSummary> {
+    return prisma.client.delete({ where: { clientId }, ...clientSummaryArgs });
   }
 }
