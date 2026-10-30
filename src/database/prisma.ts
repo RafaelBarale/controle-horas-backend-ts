@@ -10,3 +10,4 @@ const prisma = new PrismaClient({ adapter });
 export { prisma, $Enums };
 
 export type * from "../../generated/prisma/client";
+export * from "../../generated/prisma/client";

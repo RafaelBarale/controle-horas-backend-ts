@@ -12,5 +12,7 @@ model Client {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
+  projects Projects[]
+
   @@map("clients")
 }

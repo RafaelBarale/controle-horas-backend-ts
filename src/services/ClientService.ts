@@ -51,6 +51,11 @@ export class ClientService {
   }
 
   async delete(clientId: number): Promise<ClientSummary> {
+    const client = await this.clientRepository.findById(clientId);
+
+    if (!client) {
+      throw new AppError('Cliente não encontrado.', 404);
+    }
     return this.clientRepository.delete(clientId);
   }
 }

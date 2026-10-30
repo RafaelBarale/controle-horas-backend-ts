@@ -6,6 +6,7 @@ import { errorHandler } from '@middlewares/errorHandler';
 import { authenticate } from '@middlewares/authenticate';
 import authRoutes from '@routes/authRoutes';
 import clientRoutes from '@routes/clientRoutes';
+import projectRoutes from '@routes/projectRoutes';
 
 const app = express();
 
@@ -28,6 +29,9 @@ app.use('/users', authenticate, userRoutes);
 
 // Rotas de clientes
 app.use('/clients', authenticate, clientRoutes);
+
+// Rotas de projetos
+app.use('/projects', authenticate, projectRoutes);
 
 // Middleware de Erro Global (Sempre deve ser o ltimo app.use)
 app.use(errorHandler);
