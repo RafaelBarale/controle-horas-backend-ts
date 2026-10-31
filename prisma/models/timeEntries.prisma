@@ -1,0 +1,16 @@
+model TimeEntries {
+    timeEntriesId Int      @id @default(autoincrement())
+    date          DateTime
+    totalTime     Float?
+    description   String[]
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    projectId Int
+    project   Projects @relation(fields: [projectId], references: [projectId])
+
+    userId Int
+    user   User @relation(fields: [userId], references: [userId])
+
+    @@map("timeentries")
+}

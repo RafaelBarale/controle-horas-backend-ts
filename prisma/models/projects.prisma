@@ -20,5 +20,7 @@ model Projects {
     clientId    Int
     client      Client        @relation(fields: [clientId], references: [clientId])
 
+    timeentries TimeEntries[]
+
     @@map("projects")
 }
