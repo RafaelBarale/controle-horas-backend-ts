@@ -1,10 +1,10 @@
 model TimeEntries {
-    timeEntriesId Int      @id @default(autoincrement())
-    date          DateTime
-    totalTime     Float?
-    description   String[]
-    createdAt     DateTime @default(now())
-    updatedAt     DateTime @updatedAt
+    timeEntrieId Int      @id @default(autoincrement())
+    date         DateTime @db.Date
+    totalTime    Float?
+    description  String?  @db.Text
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 
     projectId Int
     project   Projects @relation(fields: [projectId], references: [projectId])

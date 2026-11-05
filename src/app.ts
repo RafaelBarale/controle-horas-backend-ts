@@ -7,6 +7,7 @@ import { authenticate } from '@middlewares/authenticate';
 import authRoutes from '@routes/authRoutes';
 import clientRoutes from '@routes/clientRoutes';
 import projectRoutes from '@routes/projectRoutes';
+import timeEntryRoutes from "@routes/timeEntryRoutes";
 
 const app = express();
 
@@ -32,6 +33,9 @@ app.use('/clients', authenticate, clientRoutes);
 
 // Rotas de projetos
 app.use('/projects', authenticate, projectRoutes);
+
+// Rotas de lancamento de tempo
+app.use('/time', authenticate, timeEntryRoutes);
 
 // Middleware de Erro Global (Sempre deve ser o ltimo app.use)
 app.use(errorHandler);
