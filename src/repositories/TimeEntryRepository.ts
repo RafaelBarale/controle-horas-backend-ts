@@ -1,5 +1,15 @@
 import { prisma, type TimeEntries, type Prisma } from "@database/prisma";
 
+// 1. Define os argumentos da consulta incluindo a relação 'timeSubEntries'
+export const timeEntryWithSubEntriesArgs = {
+  include: {
+    timeSubEntries: true,
+  },
+} satisfies Prisma.TimeEntriesFindManyArgs;
+
+// 2. Extrai o tipo gerado pelo Prisma contendo TimeEntries + array de timeSubEntries
+export type TimeEntryWithSubEntries = Prisma.TimeEntriesGetPayload<typeof timeEntryWithSubEntriesArgs>;
+
 export class TimeEntryRepository {
   async create(data: Prisma.TimeEntriesCreateInput): Promise<TimeEntries> {
     return prisma.timeEntries.create({
@@ -7,8 +17,8 @@ export class TimeEntryRepository {
     })
   }
 
-  async findAll(): Promise<TimeEntries[]> {
-    return prisma.timeEntries.findMany();
+  async findAll(): Promise<TimeEntryWithSubEntries[]> {
+    return prisma.timeEntries.findMany(timeEntryWithSubEntriesArgs);
   }
 
   async update(timeEntryId: number, data: Prisma.TimeEntriesUpdateInput): Promise<TimeEntries> {
@@ -24,9 +34,9 @@ export class TimeEntryRepository {
     })
   }
 
-  async findById(timeEntryId: number): Promise<TimeEntries | null> {
+  async findById(timeEntryId: number): Promise<TimeEntryWithSubEntries | null> {
     return prisma.timeEntries.findUnique({
-      where: { timeEntrieId: timeEntryId }
+      where: { timeEntrieId: timeEntryId }, ...timeEntryWithSubEntriesArgs
     });
   }
 

@@ -16,7 +16,7 @@ export class TimeEntryController {
 
   async getAll(_request: Request, response: Response, next: NextFunction): Promise<void> {
     try {
-      const projects = await this.timeService.getAllTime();
+      const projects = await this.timeService.getAll();
       response.status(200).json(projects);
     } catch (error: any) {
       next(error);
@@ -27,7 +27,7 @@ export class TimeEntryController {
     try {
       const parsedParams = getByIdParamsSchema.parse(request.params);
       const dataBody = request.body;
-      const project = await this.timeService.updateTimeEntrie(parsedParams.id, dataBody);
+      const project = await this.timeService.update(parsedParams.id, dataBody);
       response.status(200).json(project);
     } catch (error: any) {
       next(error);

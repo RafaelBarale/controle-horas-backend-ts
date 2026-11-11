@@ -12,5 +12,7 @@ model TimeEntries {
     userId Int
     user   User @relation(fields: [userId], references: [userId])
 
+    timeSubEntries SubTimeEntries[]
+
     @@map("timeentries")
 }

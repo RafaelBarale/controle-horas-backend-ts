@@ -12,5 +12,4 @@ timeEntryRoutes.put('/:id', validateRequest(updateTimeEntrySchema), timeControll
 timeEntryRoutes.get('/:id', validateRequest(getTimeEntrySchema), timeController.getByID.bind(timeController));
 timeEntryRoutes.delete('/:id', validateRequest(getTimeEntrySchema), timeController.delete.bind(timeController));
 
-
 export default timeEntryRoutes;

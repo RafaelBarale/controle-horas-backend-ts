@@ -1,0 +1,13 @@
+model SubTimeEntries {
+    subTimeEntryId Int      @id @default(autoincrement())
+    hourIni        DateTime
+    hourFin        DateTime
+    totalHour      String?
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    timeEntrieId Int
+    timeEntrie   TimeEntries @relation(fields: [timeEntrieId], references: [timeEntrieId], onDelete: Cascade)
+
+    @@map("subTimeEntries")
+}
