@@ -6,6 +6,13 @@ import { authEnv } from '@schemas/auth.schema';
 import { AppError } from '@utils/AppError';
 import { prisma } from '@database/prisma';
 
+interface CachedRefresh {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+}
+const recentRefreshes = new Map<string, CachedRefresh>();
+
 export class AuthService {
   constructor(private userRepo = new UserRepository()) { }
 
@@ -34,22 +41,22 @@ export class AuthService {
     const refreshToken = jwt.sign(payload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
 
     await prisma.user.update({
-        where: { userId: user.userId },
-        data: { refreshToken: refreshToken }
-      });
+      where: { userId: user.userId },
+      data: { refreshToken: refreshToken }
+    });
 
     return { accessToken, refreshToken, tokenType: 'Bearer' };
   }
 
 
-  async logout(authorization: string){
-    try{
+  async logout(authorization: string) {
+    try {
       //Valida o token
       const token = authorization.split(' ')[1];
       const payload = jwt.verify(token, authEnv.JWT_SECRET) as jwt.JwtPayload;
       //Verifica se o usuario ainda existe
       const user = await this.userRepo.findByEmail(payload.email);
-      if(!user){
+      if (!user) {
         throw new AppError('User not found', 401);
       }
       //Remove o token
@@ -57,23 +64,33 @@ export class AuthService {
         where: { userId: user.userId },
         data: { refreshToken: null }
       });
-      
+
       return { message: 'User logged out successfully' };
-    }catch(err){
-      if(err instanceof AppError) throw err;
+    } catch (err) {
+      if (err instanceof AppError) throw err;
       throw new AppError('Invalid or expired token', 401);
     }
   }
 
 
-  async refreshToken(refreshToken: string){
-    try{
+  async refreshToken(refreshToken: string) {
+    // Se este mesmo token já foi rotacionado nos últimos 15 segundos,
+    // devolve o par que acabou de ser gerado em vez de dar erro!
+    const cached = recentRefreshes.get(refreshToken);
+    if (cached && cached.expiresAt > Date.now()) {
+      return {
+        accessToken: cached.accessToken,
+        refreshToken: cached.refreshToken,
+      };
+    }
+
+    try {
       //1 verifica seo token usando o segredo de refresh
       const payload = jwt.verify(refreshToken, authEnv.JWT_REFRESH_SECRET) as jwt.JwtPayload;
 
       //checa se o usuario ainda existe e está ativo no banco
       const user = await this.userRepo.findByEmail(payload.email);
-      if(!user || user.status !== 'ATIVO'){
+      if (!user || user.status !== 'ATIVO') {
         throw new AppError('User not found or inactive', 401)
       }
 
@@ -92,12 +109,21 @@ export class AuthService {
         where: { userId: user.userId },
         data: { refreshToken: newRefreshToken }
       });
-      
+
+      // Salva no cache por 15 segundos para proteger contra requisições simultâneas
+      recentRefreshes.set(refreshToken, {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        expiresAt: Date.now() + 15 * 1000, // 15 segundos de tolerância
+      });
+      // Limpeza opcional para o Map não crescer infinitamente
+      setTimeout(() => recentRefreshes.delete(refreshToken), 20 * 1000);
+
       return { accessToken: newAccessToken, refreshToken: newRefreshToken };
-      
-    }catch(err){
-      if(err instanceof AppError) throw err;
-      
+
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+
       throw new AppError('Invalid or expired refresh token', 401);
     }
   }
