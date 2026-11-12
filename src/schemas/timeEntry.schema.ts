@@ -1,4 +1,4 @@
-import { z } from 'zod';
+ï»¿import { z } from 'zod';
 import { getByIdParamsSchema } from '@schemas/id.schema';
 
 function toMinutes(time: string): number {
@@ -7,10 +7,14 @@ function toMinutes(time: string): number {
 }
 
 const timeEntryPeriodSchema = z.object({
-  hourIni: z.iso.time({ message: "A hora inicial deve estar no formato (HH:MM)" }),
-  hourFin: z.iso.time({ message: "A hora final deve estar no formato (HH:MM)" }),
+  hourIni: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, {
+    message: "A hora inicial deve estar no formato HH:MM (entre 00:00 e 23:59)",
+  }),
+  hourFin: z.string().regex(/^(([01]\d|2[0-3]):[0-5]\d|24:00)$/, {
+    message: "A hora final deve estar no formato HH:MM (entre 00:01 e 24:00)",
+  }),
 })
-  // Garante que o fim é depois do início em cada período
+  // Garante que o fim Ã© depois do inÃ­cio em cada perÃ­odo
   .refine((period) => toMinutes(period.hourIni) < toMinutes(period.hourFin), {
     message: "A hora final deve ser maior que a hora inicial",
   });
@@ -26,19 +30,14 @@ export const createTimeEntrySchema = z.object({
       .nullish() // Aceita undefined ou null
       .transform((val) => (val === "" ? null : val)), // Transforma string vazia em null
     project: z.object({
-      projectId: z.coerce.number({ message: 'O ID deve ser um número' }).
-        int({ message: 'O ID deve ser um número inteiro' }).
-        positive({ message: 'O ID deve ser maior que 0' })
-    }),
-    user: z.object({
-      userId: z.coerce.number({ message: 'O ID deve ser um número' }).
-        int({ message: 'O ID deve ser um número inteiro' }).
+      projectId: z.coerce.number({ message: 'O ID deve ser um nÃºmero' }).
+        int({ message: 'O ID deve ser um nÃºmero inteiro' }).
         positive({ message: 'O ID deve ser maior que 0' })
     }),
     subTimeEntries: z.array(timeEntryPeriodSchema)
-      .min(1, { message: "Informe ao menos um período de inicio e fim" })
+      .min(1, { message: "Informe ao menos um perÃ­odo de inicio e fim" })
       .superRefine((periods, ctx) => {
-        const sorted = [...periods].sort((a, b) => toMinutes(a.hourIni) - toMinutes(b.hourFin));
+        const sorted = [...periods].sort((a, b) => toMinutes(a.hourIni) - toMinutes(b.hourIni));
 
         for (let i = 1; i < sorted.length; i++) {
           const current = sorted[i];
@@ -47,9 +46,9 @@ export const createTimeEntrySchema = z.object({
           if (toMinutes(current.hourIni) < toMinutes(previus.hourFin)) {
             ctx.addIssue({
               code: "custom",
-              message: "Os períodos não podem se sobrepor",
+              message: "Os perÃ­odos nÃ£o podem se sobrepor",
               path: ["subTimeEntries"],    
-            })
+            });
           }
         }
       })
@@ -68,19 +67,14 @@ export const updateTimeEntrySchema = z.object({
       .nullish() // Aceita undefined ou null
       .transform((val) => (val === "" ? null : val)), // Transforma string vazia em null
     project: z.object({
-      projectId: z.coerce.number({ message: 'O ID deve ser um número' }).
-        int({ message: 'O ID deve ser um número inteiro' }).
-        positive({ message: 'O ID deve ser maior que 0' })
-    }).optional(),
-    user: z.object({
-      userId: z.coerce.number({ message: 'O ID deve ser um número' }).
-        int({ message: 'O ID deve ser um número inteiro' }).
+      projectId: z.coerce.number({ message: 'O ID deve ser um nÃºmero' }).
+        int({ message: 'O ID deve ser um nÃºmero inteiro' }).
         positive({ message: 'O ID deve ser maior que 0' })
     }).optional(),
     subTimeEntries: z.array(timeEntryPeriodSchema)
-      .min(1, { message: "Informe ao menos um período de inicio e fim" })
+      .min(1, { message: "Informe ao menos um perÃ­odo de inicio e fim" })
       .superRefine((periods, ctx) => {
-        const sorted = [...periods].sort((a, b) => toMinutes(a.hourIni) - toMinutes(b.hourFin));
+        const sorted = [...periods].sort((a, b) => toMinutes(a.hourIni) - toMinutes(b.hourIni));
 
         for (let i = 1; i < sorted.length; i++) {
           const current = sorted[i];
@@ -89,9 +83,9 @@ export const updateTimeEntrySchema = z.object({
           if (toMinutes(current.hourIni) < toMinutes(previus.hourFin)) {
             ctx.addIssue({
               code: "custom",
-              message: "Os períodos não podem se sobrepor",
+              message: "Os perÃ­odos nÃ£o podem se sobrepor",
               path: ["subTimeEntries"],    
-            })
+            });
           }
         }
       })

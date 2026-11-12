@@ -1,13 +1,19 @@
 import { getByIdParamsSchema } from "@schemas/id.schema";
 import type { NextFunction, Request, Response } from "express";
 import { TimeEntryService } from "@services/TimeEntryService";
+import { AppError } from "@utils/AppError";
 
 export class TimeEntryController {
   private timeService = new TimeEntryService();
   async create(request: Request, response: Response, next: NextFunction): Promise<void> {
     try {
       const dataBody = request.body;
-      const project = await this.timeService.create(dataBody);
+      const userId = Number(request.user?.id);
+      if (!userId) {
+        throw new AppError('Usuário não autenticado.', 401);
+      }
+
+      const project = await this.timeService.create(dataBody, userId);
       response.status(201).json(project);
     } catch (error: any) {
       next(error);

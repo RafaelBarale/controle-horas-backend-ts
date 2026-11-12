@@ -1,4 +1,4 @@
-import { Prisma, type TimeEntries } from "@database/prisma";
+ï»¿import { Prisma, type TimeEntries } from "@database/prisma";
 import { AppError } from "@utils/AppError";
 import { TimeEntryRepository } from "@repositories/TimeEntryRepository";
 import { UserRepository } from "@repositories/UserRepository";
@@ -31,12 +31,11 @@ export class TimeEntryService {
     return this.TimeEntryRepository.delete(timeEntrieId);
   }
 
-  async create(data: CreateTimeEntryBody): Promise<TimeEntries> {
-    const { project, user, subTimeEntries, date, ...resdata } = data;
-    // const targetDate = new Date(date.toISOString().split('T')[0]);
+  async create(data: CreateTimeEntryBody, userId: number): Promise<TimeEntries> {
+    const { project, subTimeEntries, date, ...resdata } = data;
 
     const targetProjectId = project?.projectId;
-    const targetUserId = user?.userId;
+    const targetUserId = userId;
 
     if (!targetProjectId || !targetUserId) {
       throw new AppError('O ID do projeto e do usuario sao obrigatorios.', 400);
@@ -67,9 +66,9 @@ export class TimeEntryService {
       user: { connect: { userId: targetUserId } },
       timeSubEntries: {
         create: intervals.map(i => ({
-          hourIni: this.minutesToTimeDate(i.ini, date),//.toISOString().split('T')[1],
-          hourFin: this.minutesToTimeDate(i.fin, date),//.toISOString().split('T')[1],
-          totalHour: this.minutesToTimeDate(i.fin - i.ini, date).toISOString().split('T')[1],
+          hourIni: this.minutesToTimeDate(i.ini, date),
+          hourFin: this.minutesToTimeDate(i.fin, date),
+          totalHour: this.minutesToHhmmss(i.fin - i.ini),
         })),
       },
     };
@@ -77,31 +76,26 @@ export class TimeEntryService {
   }
 
   async update(timeEntrieId: number, data: UpdateTimeEntryBody): Promise<TimeEntries> {
-    await this.getTimeOrThrow(timeEntrieId);
-
-    const { project, user, date, subTimeEntries, ...resdata } = data;
-    // const targetDate = new Date(date.toISOString().split('T')[0]);
-    const projectId = project?.projectId ?? null;
-    const userId = user?.userId ?? null;
+    const existingTime = await this.getTimeOrThrow(timeEntrieId);
+    const { project, date, subTimeEntries, ...resdata } = data;
+    const targetProjectId = project?.projectId ?? existingTime.projectId;
+    const targetUserId = existingTime.userId;
 
     // Valida os intervalos antes de qualquer consulta ao banco
     const intervals = subTimeEntries ? this.buildIntervals(subTimeEntries) : null;
 
-
-    if (userId) {
-      if (!await this.UserRepository.findById(userId)) {
+    if (targetUserId) {
+      if (!await this.UserRepository.findById(targetUserId)) {
         throw new AppError('Id de usuario nao encontrado.', 404);
       }
     }
 
-    if (projectId) {
-      if (!await this.ProjectRepository.findById(projectId)) {
-        throw new AppError('Id de projeto nao encontrado.', 404);
-      }
+    if (project?.projectId && !await this.ProjectRepository.findById(project.projectId)) {
+      throw new AppError('Id de projeto nao encontrado.', 404);
     }
 
     // 1. Buscamos o lancamento (que pode retornar o objeto ou null)
-    const timeEntrie = await this.TimeEntryRepository.findByDate(date, projectId, userId);
+    const timeEntrie = await this.TimeEntryRepository.findByDate(date, targetProjectId, targetUserId);
 
     // 2. Validamos usando o operador ?. e adicionando a checagem se ele existe
     if (timeEntrie && timeEntrie.timeEntrieId !== timeEntrieId) {
@@ -114,12 +108,8 @@ export class TimeEntryService {
       description: resdata.description ?? null,
     };
 
-    if (projectId) {
-      Object.assign(dataUpdate, { project: { connect: { projectId } } });
-    }
-
-    if (userId) {
-      Object.assign(dataUpdate, { user: { connect: { userId } } });
+    if (project?.projectId) {
+      Object.assign(dataUpdate, { project: { connect: { projectId: targetProjectId } } });
     }
 
     if (intervals) {
@@ -131,7 +121,7 @@ export class TimeEntryService {
         create: intervals.map(i => ({
           hourIni: this.minutesToTimeDate(i.ini, date),
           hourFin: this.minutesToTimeDate(i.fin, date),
-          totalHour: this.minutesToTimeDate(i.fin - i.ini, date).toISOString().split('T')[1],
+          totalHour: this.minutesToHhmmss(i.fin - i.ini),
         })),
       };
       return this.TimeEntryRepository.update(timeEntrieId, dataUpdate);
@@ -140,10 +130,10 @@ export class TimeEntryService {
     return this.TimeEntryRepository.update(timeEntrieId, dataUpdate);
   }
 
-  // estruturando a logica para validar se as horas sao validas, nao se sobrepoem e se o horario de fim é maior que o de inicio
+  // estruturando a logica para validar se as horas sao validas, nao se sobrepoem e se o horario de fim Ã© maior que o de inicio
   private buildIntervals(subs: { hourIni: string; hourFin: string }[]) {
     if (subs.length === 0) {
-      throw new AppError('É necessário informar pelo menos um intervalo.', 400);
+      throw new AppError('Ã‰ necessÃ¡rio informar pelo menos um intervalo.', 400);
     }
 
     const parsed = subs
@@ -159,16 +149,18 @@ export class TimeEntryService {
 
     for (let i = 1; i < parsed.length; i++) {
       if (parsed[i].ini < parsed[i - 1].fin) {
-        throw new AppError('Os intervalos do mesmo lançamento não podem se sobrepor.', 400);
+        throw new AppError('Os intervalos do mesmo lanÃ§amento nÃ£o podem se sobrepor.', 400);
       }
     }
 
     return parsed;
   }
 
-
-  //  funcao para transformar horas em minutos
+  // funcao para transformar horas em minutos (aceita ate 24:00 no fim)
   private hhmmToMinutes(hhmm: string): number {
+    if (hhmm === "24:00") {
+      return 24 * 60; // 1440 minutos
+    }
     const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm);
     if (!match) {
       throw new AppError(`Horario invalido: ${hhmm}`, 400);
@@ -176,25 +168,24 @@ export class TimeEntryService {
     return Number(match[1]) * 60 + Number(match[2]);
   }
 
-  //funcao para transformar minutos em horas e minutos (exemplo: 125 -> 02:05)
-  private minutesToTimeDate(minutes: number, date: Date): Date {
+  // formata duracao de minutos para HH:MM:00.000Z
+  private minutesToHhmmss(minutes: number): string {
     const h = String(Math.floor(minutes / 60)).padStart(2, '0');
     const m = String(minutes % 60).padStart(2, '0');
-    const dateFormt = this.formatarDataComOffset(date)
-    // return new Date(`1970-01-01T${h}:${m}:00Z`);
-    return new Date(`${dateFormt}T${h}:${m}:00Z`);
-  };
-
-  //formata a data para o formato brasileiro sem offset
-  private formatarDataComOffset(data: Date): string {
-    // Obtém a diferença entre o horário local e o UTC em minutos (ex: 180 para GMT-3)
-    const offsetEmMinutos: number = data.getTimezoneOffset();
-
-    // Cria uma nova data ajustada (converte minutos para milissegundos multiplicando por 60.000)
-    const dataAjustada: Date = new Date(data.getTime() - (offsetEmMinutos * 60000));
-
-    // Agora o toISOString() vai refletir exatamente o horário local
-    return dataAjustada.toISOString().split('T')[0];
+    return `${h}:${m}:00.000Z`;
   }
 
+  // converte minutos a partir da meia-noite da data informada em objeto Date seguro
+  private minutesToTimeDate(minutes: number, date: Date): Date {
+    const dateFormt = this.formatarDataComOffset(date);
+    const baseDate = new Date(`${dateFormt}T00:00:00.000Z`);
+    return new Date(baseDate.getTime() + minutes * 60 * 1000);
+  }
+
+  // formata a data para o formato brasileiro sem offset
+  private formatarDataComOffset(data: Date): string {
+    const offsetEmMinutos: number = data.getTimezoneOffset();
+    const dataAjustada: Date = new Date(data.getTime() - (offsetEmMinutos * 60000));
+    return dataAjustada.toISOString().split('T')[0];
+  }
 }

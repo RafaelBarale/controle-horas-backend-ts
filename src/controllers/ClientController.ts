@@ -9,7 +9,6 @@ export class ClientController {
   async create(request: Request, response: Response, next: NextFunction): Promise<void> {
     try {
       const { name, email, ein, status } = request.body;
-
       const client = await this.clientService.registerClient({ name, email, ein, status });
 
       response.status(201).json(client);
