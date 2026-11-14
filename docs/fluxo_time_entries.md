@@ -1,4 +1,4 @@
-﻿# Fluxo do MÃ³dulo de LanÃ§amento de Horas (Time Entries & SubTimeEntries)
+# Fluxo do MÃ³dulo de LanÃ§amento de Horas (Time Entries & SubTimeEntries)
 
 Este documento descreve detalhadamente a arquitetura, os fluxos de requisiÃ§Ã£o e as regras de negÃ³cio do mÃ³dulo de **LanÃ§amento de Horas** (`/time`), cobrindo validaÃ§Ã£o de schemas Zod, controle de acesso JWT, integridade referencial com projetos e usuÃ¡rios, decomposiÃ§Ã£o em intervalos de tempo (**SubTimeEntries**), cÃ¡lculo automÃ¡tico de total de horas, prevenÃ§Ã£o de sobreposiÃ§Ã£o de horÃ¡rios e persistÃªncia transacional com o Prisma.
 
@@ -474,3 +474,9 @@ export const createTimeEntrySchema = z.object({
 * **Tipagem Segura com `Prisma.TimeEntriesGetPayload`:** A camada de repositÃ³rio exporta `TimeEntryWithSubEntries`, fornecendo ao TypeScript conhecimento exato sobre os relacionamentos incluÃ­dos em `findAll` e `findById`.
 * **Tratamento de Timezone e Fuso HorÃ¡rio:** Uso de `formatarDataComOffset` para garantir que as datas geradas para os horÃ¡rios `hourIni` e `hourFin` reflitam a data local correta sem desvios de GMT.
 
+
+### Atualizações adicionais
+
+- **TimeEntry (`/time`)**: o `userId` **não** deve ser enviado no corpo da requisição. Ele é extraído do token JWT pelo middleware `authenticate` e passado ao serviço (`request.user?.id`).
+- **Regras de intervalo**: períodos contíguos são permitidos (ex.: `09:00‑12:00` + `12:00‑13:00`). O campo `hourFin` aceita o valor `24:00`. Horários que atravessam a meia‑noite devem ser divididos em duas entradas.
+- **Autorização**: as rotas de criação, atualização e exclusão de lançamentos de horas requerem apenas que o usuário esteja autenticado (qualquer role). As rotas de listagem (`GET`) são abertas a qualquer usuário autenticado.

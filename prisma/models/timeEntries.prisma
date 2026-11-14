@@ -1,7 +1,7 @@
 model TimeEntries {
     timeEntrieId Int      @id @default(autoincrement())
     date         DateTime @db.Date
-    totalTime    Float?
+    totalTime    Decimal? @db.Decimal(12, 2)
     description  String?  @db.Text
     createdAt    DateTime @default(now())
     updatedAt    DateTime @updatedAt
@@ -14,5 +14,6 @@ model TimeEntries {
 
     timeSubEntries SubTimeEntries[]
 
+    @@unique([userId, projectId, date])
     @@map("timeentries")
 }

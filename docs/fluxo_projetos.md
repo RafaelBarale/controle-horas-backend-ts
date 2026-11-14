@@ -382,3 +382,7 @@ export const createProjectSchema = z.object({
 * **Princípio DRY (Don't Repeat Yourself):** Utilização do método helper privado `getProjectOrThrow` em `ProjectService` para unificar a verificação de existência e tratamento de 404 em consultas individuais, updates e deleções.
 * **Arquitetura em Camadas (Separation of Concerns):** Roteamento, validação, controle de requisição, regras de negócio e persistência no banco são completamente desacoplados em classes e módulos com responsabilidade única.
 
+
+### Atualizações adicionais
+
+- **Autorização:** As rotas de criação, atualização e exclusão (`POST`, `PUT`, `DELETE`) exigem a role `ADMIN`. Apenas usuários com `role: "ADMIN"` podem acessar essas rotas; as rotas de listagem (`GET`) são abertas a qualquer usuário autenticado.

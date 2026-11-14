@@ -22,5 +22,6 @@ model Projects {
 
     timeentries TimeEntries[]
 
+    @@unique([clientId, title])
     @@map("projects")
 }

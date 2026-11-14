@@ -21,9 +21,9 @@ export const authEnv = authSchema.parse(process.env);
 
 export const refreshTokenSchema = z.object({
   params: z.object({
-    id: z.string().uuid('ID do usu·rio inv·lido!'),
+    id: z.string().uuid('ID do usu√°rio inv√°lido!'),
   }),
   body: z.object({
-    refreshToken: z.string().min(1, 'Refresh token inv·lido!'),
+    refreshToken: z.string().min(1, 'Refresh token inv√°lido!'),
   })
 });

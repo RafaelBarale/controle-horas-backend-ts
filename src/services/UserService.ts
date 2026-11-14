@@ -10,14 +10,14 @@ export class UserService {
 
   async registerUser(data: Prisma.UserCreateInput): Promise<UserSummary> {
     const userExists = await this.userRepository.findByEmail(data.email);
-    
+
     if (userExists) {
       throw new AppError('Este e-mail ja esta em uso.', 400); // 400 Bad Request
     }
 
     // Criptografia de senha
     data.password = await bcrypt.hash(data.password, 10);
-    
+
     return this.userRepository.create(data);
   }
 
@@ -29,17 +29,21 @@ export class UserService {
 
     const userExists = await this.userRepository.findById(userId);
 
-    if(!userExists) {
+    if (!userExists) {
       throw new AppError('Usuário não encontrado.', 404);
     }
 
     // Verifica se o email foi alterado e se o novo email ja existe
-    if(data.email && String(data.email) !== userExists.email) {
+    if (data.email && String(data.email) !== userExists.email) {
       const emailExists = await this.userRepository.findByEmail(data.email);
-      
+
       if (emailExists) {
         throw new AppError('Este e-mail ja esta em uso.', 400); // 400 Bad Request
       }
+    }
+
+    if (data.password) {
+      data.password = await bcrypt.hash(data.password, 10);
     }
 
     return this.userRepository.update(userId, data);
@@ -47,8 +51,12 @@ export class UserService {
 
   async getByID(userId: number): Promise<UserSummary> {
     const user = await this.userRepository.findById(userId);
+    
+    if (!user || user.status !== 'ATIVO') {
+      throw new AppError('Invalid or user inactive', 401);
+    }
 
-    if(!user) {
+    if (!user) {
       throw new AppError('Usuário não encontrado.', 404);
     }
 
@@ -56,6 +64,11 @@ export class UserService {
   }
 
   async delete(userId: number): Promise<UserSummary> {
+    const userExists = await this.userRepository.findById(userId);
+
+    if (!userExists) {
+      throw new AppError('Usuário não encontrado.', 404);
+    }
     return this.userRepository.delete(userId);
   }
 }

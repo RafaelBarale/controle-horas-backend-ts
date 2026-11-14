@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken';
 import { UserRepository } from '@repositories/UserRepository';
 import { authEnv } from '@schemas/auth.schema';
 import { AppError } from '@utils/AppError';
-import { prisma } from '@database/prisma';
 
 interface CachedRefresh {
   accessToken: string;
@@ -32,7 +31,8 @@ export class AuthService {
     const payload = {
       userId: user.userId,
       email: user.email,
-      role: user.role
+      role: user.role,
+      name: user.name
     };
 
     //Gera o token de acesso
@@ -40,10 +40,9 @@ export class AuthService {
     //Gera o token de refresh
     const refreshToken = jwt.sign(payload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
 
-    await prisma.user.update({
-      where: { userId: user.userId },
-      data: { refreshToken: refreshToken }
-    });
+    await this.userRepo.update(
+      user.userId, { refreshToken: refreshToken }
+    );
 
     return { accessToken, refreshToken, tokenType: 'Bearer' };
   }
@@ -60,10 +59,9 @@ export class AuthService {
         throw new AppError('User not found', 401);
       }
       //Remove o token
-      await prisma.user.update({
-        where: { userId: user.userId },
-        data: { refreshToken: null }
-      });
+      await this.userRepo.update(
+        user.userId, { refreshToken: null }
+      );
 
       return { message: 'User logged out successfully' };
     } catch (err) {
@@ -74,7 +72,7 @@ export class AuthService {
 
 
   async refreshToken(refreshToken: string) {
-    // Se este mesmo token já foi rotacionado nos últimos 15 segundos,
+    // Se este mesmo token jÑ€ foi rotacionado nos Ð©ltimos 15 segundos,
     // devolve o par que acabou de ser gerado em vez de dar erro!
     const cached = recentRefreshes.get(refreshToken);
     if (cached && cached.expiresAt > Date.now()) {
@@ -88,7 +86,7 @@ export class AuthService {
       //1 verifica seo token usando o segredo de refresh
       const payload = jwt.verify(refreshToken, authEnv.JWT_REFRESH_SECRET) as jwt.JwtPayload;
 
-      //checa se o usuario ainda existe e está ativo no banco
+      //checa se o usuario ainda existe e estÑ€ ativo no banco
       const user = await this.userRepo.findByEmail(payload.email);
       if (!user || user.status !== 'ATIVO') {
         throw new AppError('User not found or inactive', 401)
@@ -98,25 +96,25 @@ export class AuthService {
       const newPayload = {
         userId: user.userId,
         email: user.email,
-        role: user.role
+        role: user.role,
+        name: user.name
       };
       const newAccessToken = jwt.sign(newPayload, authEnv.JWT_SECRET, { expiresIn: authEnv.JWT_EXPIRES_IN });
 
       //Gera um novo token de refresh
       const newRefreshToken = jwt.sign(newPayload, authEnv.JWT_REFRESH_SECRET, { expiresIn: authEnv.JWT_REFRESH_EXPIRES_IN });
 
-      await prisma.user.update({
-        where: { userId: user.userId },
-        data: { refreshToken: newRefreshToken }
-      });
+      await this.userRepo.update(
+        user.userId, { refreshToken: refreshToken }
+      );
 
-      // Salva no cache por 15 segundos para proteger contra requisições simultâneas
+      // Salva no cache por 15 segundos para proteger contra requisiÑƒÑˆes simultÐ neas
       recentRefreshes.set(refreshToken, {
         accessToken: newAccessToken,
         refreshToken: newRefreshToken,
-        expiresAt: Date.now() + 15 * 1000, // 15 segundos de tolerância
+        expiresAt: Date.now() + 15 * 1000, // 15 segundos de tolerÐ ncia
       });
-      // Limpeza opcional para o Map não crescer infinitamente
+      // Limpeza opcional para o Map nÑo crescer infinitamente
       setTimeout(() => recentRefreshes.delete(refreshToken), 20 * 1000);
 
       return { accessToken: newAccessToken, refreshToken: newRefreshToken };
