@@ -289,7 +289,13 @@ export class TimeEntryController {
   async delete(request: Request, response: Response, next: NextFunction): Promise<void> {
     try {
       const parsedParams = getByIdParamsSchema.parse(request.params);
-      const result = await this.timeService.delete(parsedParams.id);
+      const userId = Number(request.user?.id);
+
+      if (!userId) {
+        throw new AppError('Usuário não autenticado.', 401);
+      }
+
+      const result = await this.timeService.delete(parsedParams.id, userId, request.user?.role);
       response.status(200).json(result);
     } catch (error) {
       next(error);

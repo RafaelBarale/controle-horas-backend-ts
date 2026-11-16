@@ -41,18 +41,19 @@ sequenceDiagram
     participant TimeRepo as TimeEntryRepository.ts
     participant DB as PostgreSQL (Prisma)
 
-    Cliente->>AuthMW: POST /time (Header: Bearer Token, Body: { date, project, user, subTimeEntries, description? })
-    Note over AuthMW: Valida assinatura e expiraÃ§Ã£o do JWT
+    Cliente->>AuthMW: POST /time (Header: Bearer Token, Body: { date, project, subTimeEntries, description? })
+    Note over AuthMW: Valida assinatura e expiração do JWT e injeta req.user.id
     AuthMW->>Route: next() -> Encaminha para timeEntryRoutes
     Route->>ValMW: validateRequest(createTimeEntrySchema)
 
-    alt Payload invÃ¡lido (formato de hora, sobreposiÃ§Ã£o no Zod, min 1 perÃ­odo)
-        ValMW-->>Cliente: 400 Bad Request { status: "error", message: "Dados invÃ¡lidos", errors: [...] }
-    else Payload vÃ¡lido
+    alt Payload inválido (formato de hora, sobreposição no Zod, min 1 período)
+        ValMW-->>Cliente: 400 Bad Request { status: "error", message: "Dados inválidos", errors: [...] }
+    else Payload válido
         ValMW->>Controller: next() -> Chama create(req, res, next)
-        Controller->>Service: create({ date, description, project, user, subTimeEntries })
+        Note over Controller: Extrai userId = Number(req.user.id)
+        Controller->>Service: create({ date, description, project, subTimeEntries }, userId)
 
-        alt projectId ou userId ausentes
+        alt projectId ausente ou inválido
             Service-->>Controller: throw AppError("O ID do projeto e do usuario sao obrigatorios.", 400)
             Controller-->>Cliente: 400 Bad Request
         else IDs fornecidos
@@ -224,22 +225,26 @@ sequenceDiagram
     participant TimeRepo as TimeEntryRepository.ts
     participant DB as PostgreSQL (Prisma)
 
-    Cliente->>AuthMW: PUT /time/:id { date, description?, project?, user?, subTimeEntries? }
+    Cliente->>AuthMW: PUT /time/:id { date, description?, project?, subTimeEntries? }
     AuthMW->>Route: next()
     Route->>ValMW: validateRequest(updateTimeEntrySchema)
 
-    alt ParÃ¢metros ou corpo invÃ¡lidos
+    alt Parâmetros ou corpo inválidos
         ValMW-->>Cliente: 400 Bad Request
-    else Dados vÃ¡lidos
+    else Dados válidos
         ValMW->>Controller: next() -> update(req, res, next)
         Controller->>Controller: getByIdParamsSchema.parse(req.params)
-        Controller->>Service: update(id, body)
+        Note over Controller: Extrai userId = Number(req.user.id) e role = req.user.role
+        Controller->>Service: update(id, body, userId, role)
         Service->>Service: getTimeOrThrow(id)
 
-        alt LanÃ§amento inexistente
+        alt Lançamento inexistente
             Service-->>Controller: throw AppError("Id de tempo nao encontrado.", 404)
             Controller-->>Cliente: 404 Not Found
-        else LanÃ§amento existe
+        else Lançamento não pertence ao usuário (entry.userId !== userId e role !== 'ADMIN')
+            Service-->>Controller: throw AppError("Você não tem permissão para editar este lançamento.", 403)
+            Controller-->>Cliente: 403 Forbidden
+        else Lançamento autorizado
             opt Se subTimeEntries fornecido
                 Service->>Service: buildIntervals(subTimeEntries)
                 Note over Service: Valida ini < fin e ausÃªncia de sobreposiÃ§Ã£o
@@ -328,13 +333,17 @@ sequenceDiagram
     else ID vÃ¡lido
         ValMW->>Controller: next() -> delete(req, res, next)
         Controller->>Controller: getByIdParamsSchema.parse(req.params)
-        Controller->>Service: delete(id)
+        Note over Controller: Extrai userId = Number(req.user.id) e role = req.user.role
+        Controller->>Service: delete(id, userId, role)
         Service->>Service: getTimeOrThrow(id)
         
         alt LanÃ§amento nÃ£o encontrado
             Service-->>Controller: throw AppError("Id de tempo nao encontrado.", 404)
             Controller-->>Cliente: 404 Not Found
-        else LanÃ§amento existe
+        else LanÃ§amento nÃ£o pertence ao usuÃ¡rio (entry.userId !== userId e role !== 'ADMIN')
+            Service-->>Controller: throw AppError("VocÃª nÃ£o tem permissÃ£o para excluir este lanÃ§amento.", 403)
+            Controller-->>Cliente: 403 Forbidden
+        else LanÃ§amento autorizado
             Service->>Repo: delete(id)
             Repo->>DB: prisma.timeEntries.delete({ where: { timeEntrieId } })
             Note over DB: Cascading Delete remove registros de subTimeEntries
@@ -347,10 +356,11 @@ sequenceDiagram
 ```
 
 ### Passo a Passo:
-1. **ValidaÃ§Ã£o de ID:** Valida o parÃ¢metro `:id` da rota via `getByIdParamsSchema`.
-2. **VerificaÃ§Ã£o PrÃ©via:** Executa `getTimeOrThrow(id)`. Se nÃ£o encontrado, lanÃ§a erro `404 Not Found`.
-3. **ExclusÃ£o em Cascata:** Executa `TimeEntryRepository.delete(id)`. Pela configuraÃ§Ã£o `onDelete: Cascade` na relaÃ§Ã£o de `SubTimeEntries`, o PostgreSQL remove atomicamente todos os sub-intervalos vinculados.
-4. **Resposta:** Devolve os dados do lanÃ§amento excluÃ­do com status `200 OK`.
+1. **Validação de ID:** Valida o parâmetro `:id` da rota via `getByIdParamsSchema`.
+2. **Verificação Prévia:** Executa `getTimeOrThrow(id)`. Se não encontrado, lança erro `404 Not Found`.
+3. **Checagem de Propriedade (Ownership):** O `TimeEntryService.delete` verifica se `entry.userId === userId` ou se `role === 'ADMIN'`. Se for outro usuário tentando excluir, lança `403 Forbidden` (`"Você não tem permissão para excluir este lançamento."`).
+4. **Exclusão em Cascata:** Executa `TimeEntryRepository.delete(id)`. Pela configuração `onDelete: Cascade` na relação de `SubTimeEntries`, o PostgreSQL remove atomicamente todos os sub-intervalos vinculados.
+5. **Resposta:** Devolve os dados do lançamento excluído com status `200 OK`.
 
 ---
 
@@ -428,9 +438,6 @@ export const createTimeEntrySchema = z.object({
     project: z.object({
       projectId: z.coerce.number().int().positive()
     }),
-    user: z.object({
-      userId: z.coerce.number().int().positive()
-    }),
     subTimeEntries: z.array(timeEntryPeriodSchema)
       .min(1, { message: "Informe ao menos um perÃ­odo de inicio e fim" })
       .superRefine((periods, ctx) => {
@@ -453,30 +460,32 @@ export const createTimeEntrySchema = z.object({
 
 ## 8. Tratamento de Erros e CÃ³digos de Status HTTP
 
-| CÃ³digo | SituaÃ§Ã£o | Exemplo de Mensagem |
+| Código | Situação | Exemplo de Mensagem |
 | :--- | :--- | :--- |
-| `200 OK` | Consulta, atualizaÃ§Ã£o ou remoÃ§Ã£o executada com sucesso. | Objeto `TimeEntries` ou lista `TimeEntryWithSubEntries[]`. |
-| `201 Created` | Apontamento de tempo e sub-intervalos registrados com sucesso. | Objeto `TimeEntries` recÃ©m-criado. |
-| `400 Bad Request` | Falha de validaÃ§Ã£o Zod (formato `HH:MM`, `hourFin <= hourIni`, sobreposiÃ§Ã£o de perÃ­odos, ausÃªncia de perÃ­odos obrigatÃ³rios) ou lanÃ§amento duplicado para a mesma data/usuÃ¡rio/projeto. | `"Os perÃ­odos nÃ£o podem se sobrepor"`, `"A hora final deve ser maior que a hora inicial"` ou `"Ja existe lancamento de tempo nesta data para este projeto/usuario"`. |
-| `401 Unauthorized` | Token de autenticaÃ§Ã£o JWT ausente, expirado ou corrompido. | `"Token missing"` / `"Token expired"` / `"Invalid token"`. |
-| `404 Not Found` | O `id` do lanÃ§amento, o `projectId` ou o `userId` nÃ£o foi localizado. | `"Id de tempo nao encontrado."`, `"Id de projeto nao encontrado."` ou `"Id de usuario nao encontrado."`. |
+| `200 OK` | Consulta, atualização ou remoção executada com sucesso. | Objeto `TimeEntries` ou lista `TimeEntryWithSubEntries[]`. |
+| `201 Created` | Apontamento de tempo e sub-intervalos registrados com sucesso. | Objeto `TimeEntries` recém-criado. |
+| `400 Bad Request` | Falha de validação Zod (formato `HH:MM`, `hourFin <= hourIni`, sobreposição de períodos, ausência de períodos obrigatórios) ou lançamento duplicado para a mesma data/usuário/projeto. | `"Os períodos não podem se sobrepor"`, `"A hora final deve ser maior que a hora inicial"` ou `"Ja existe lancamento de tempo nesta data para este projeto/usuario"`. |
+| `401 Unauthorized` | Token de autenticação JWT ausente, expirado ou corrompido. | `"Token missing"` / `"Token expired"` / `"Invalid token"`. |
+| `403 Forbidden` | Usuário tentando atualizar ou excluir lançamento pertencente a outro colaborador (sem perfil `ADMIN`). | `"Você não tem permissão para editar este lançamento."` / `"Você não tem permissão para excluir este lançamento."` |
+| `404 Not Found` | O `id` do lançamento, o `projectId` ou o `userId` não foi localizado. | `"Id de tempo nao encontrado."`, `"Id de projeto nao encontrado."` ou `"Id de usuario nao encontrado."`. |
 | `500 Internal Server Error` | Falhas inesperadas de banco de dados ou infraestrutura. | `"Internal Server Error"`. |
 
 ---
 
-## 9. Boas PrÃ¡ticas Adotadas
+## 9. Boas Práticas Adotadas
 
-* **ValidaÃ§Ã£o em Camadas (Zod + Domain Service):** A integridade dos horÃ¡rios e intervalos Ã© verificada tanto na entrada via schema Zod (`timeEntryPeriodSchema` e `.superRefine`) quanto dentro do `TimeEntryService` (`buildIntervals`), garantindo consistÃªncia em qualquer canal de entrada.
-* **CÃ¡lculo Automatizado de Horas (`totalTime`):** O usuÃ¡rio informa os horÃ¡rios de inÃ­cio e tÃ©rmino (`HH:MM`) e a aplicaÃ§Ã£o calcula com precisÃ£o a duraÃ§Ã£o total em minutos e converte para horas decimais (`totalMinutes / 60`), evitando erros manuais de cÃ¡lculo.
-* **PrevenÃ§Ã£o de SobreposiÃ§Ã£o Temporal:** Algoritmo de ordenaÃ§Ã£o e comparaÃ§Ã£o de adjacÃªncia que impede apontamentos de horÃ¡rios conflitantes no mesmo dia para o mesmo colaborador.
-* **OperaÃ§Ãµes Transacionais com Prisma:** Na criaÃ§Ã£o e atualizaÃ§Ã£o, a persistÃªncia do lanÃ§amento pai e a substituiÃ§Ã£o/criaÃ§Ã£o dos `timeSubEntries` ocorrem de forma atÃ´mica (incluindo `deleteMany + create` no update).
-* **Integridade Referencial com Cascade Delete:** ConfiguraÃ§Ã£o `@relation(..., onDelete: Cascade)` no modelo `SubTimeEntries`, garantindo que a exclusÃ£o de um lanÃ§amento limpe seus intervalos sem deixar registros Ã³rfÃ£os.
-* **Tipagem Segura com `Prisma.TimeEntriesGetPayload`:** A camada de repositÃ³rio exporta `TimeEntryWithSubEntries`, fornecendo ao TypeScript conhecimento exato sobre os relacionamentos incluÃ­dos em `findAll` e `findById`.
-* **Tratamento de Timezone e Fuso HorÃ¡rio:** Uso de `formatarDataComOffset` para garantir que as datas geradas para os horÃ¡rios `hourIni` e `hourFin` reflitam a data local correta sem desvios de GMT.
+* **Validação em Camadas (Zod + Domain Service):** A integridade dos horários e intervalos é verificada tanto na entrada via schema Zod (`timeEntryPeriodSchema` e `.superRefine`) quanto dentro do `TimeEntryService` (`buildIntervals`), garantindo consistência em qualquer canal de entrada.
+* **Controle de Acesso Fino (Ownership):** O `TimeEntryService` valida ativamente se o `userId` do registro salvo coincide com o `userId` autenticado no token JWT, impedindo que um colaborador manipule apontamentos alheios e permitindo que apenas administradores (`ADMIN`) tenham permissão global de edição/exclusão.
+* **Cálculo Automatizado de Horas (`totalTime`):** O usuário informa os horários de início e término (`HH:MM`) e a aplicação calcula com precisão a duração total em minutos e converte para horas decimais (`totalMinutes / 60`), evitando erros manuais de cálculo.
+* **Prevenção de Sobreposição Temporal:** Algoritmo de ordenação e comparação de adjacência que impede apontamentos de horários conflitantes no mesmo dia para o mesmo colaborador.
+* **Operações Transacionais com Prisma:** Na criação e atualização, a persistência do lançamento pai e a substituição/criação dos `timeSubEntries` ocorrem de forma atômica (incluindo `deleteMany + create` no update).
+* **Integridade Referencial com Cascade Delete:** Configuração `@relation(..., onDelete: Cascade)` no modelo `SubTimeEntries`, garantindo que a exclusão de um lançamento limpe seus intervalos sem deixar registros órfãos.
+* **Tipagem Segura com `Prisma.TimeEntriesGetPayload`:** A camada de repositório exporta `TimeEntryWithSubEntries`, fornecendo ao TypeScript conhecimento exato sobre os relacionamentos incluídos em `findAll` e `findById`.
+* **Tratamento de Timezone e Fuso Horário:** Uso de `formatarDataComOffset` para garantir que as datas geradas para os horários `hourIni` e `hourFin` reflitam a data local correta sem desvios de GMT.
 
 
 ### Atualizações adicionais
 
 - **TimeEntry (`/time`)**: o `userId` **não** deve ser enviado no corpo da requisição. Ele é extraído do token JWT pelo middleware `authenticate` e passado ao serviço (`request.user?.id`).
 - **Regras de intervalo**: períodos contíguos são permitidos (ex.: `09:00‑12:00` + `12:00‑13:00`). O campo `hourFin` aceita o valor `24:00`. Horários que atravessam a meia‑noite devem ser divididos em duas entradas.
-- **Autorização**: as rotas de criação, atualização e exclusão de lançamentos de horas requerem apenas que o usuário esteja autenticado (qualquer role). As rotas de listagem (`GET`) são abertas a qualquer usuário autenticado.
+- **Autorização e Ownership**: qualquer usuário autenticado pode criar e listar apontamentos. No entanto, para **atualizar (`PUT`)** ou **excluir (`DELETE`)**, apenas o próprio autor do apontamento ou administradores (`ADMIN`) possuem autorização (outros usuários recebem `403 Forbidden`).

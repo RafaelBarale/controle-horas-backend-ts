@@ -24,9 +24,9 @@ O **Controle de Horas** é uma plataforma web para gestão de tempos de trabalho
 | Módulo | Funcionalidades Principais | Regras Críticas |
 | :--- | :--- | :--- |
 | **Autenticação** | Login com e-mail/senha, renovação automática de token (`refresh_token`), logout e proteção de rotas. | O token de acesso expira e deve ser renovado de forma transparente pelo interceptor HTTP sem deslogar o usuário. |
-| **Clientes** | Listagem com busca, cadastro, edição e exclusão. | O campo `ein` (CNPJ/identificador) deve ter de 2 a 14 caracteres e é único no sistema. |
-| **Projetos** | Listagem, filtros por status e cliente, cadastro com preço e tipo (`ABERTO` / `FECHADO`). | O título do projeto não pode ser repetido para o mesmo cliente. |
-| **Lançamento de Horas** | Calendário / Timesheet diário, construtor de múltiplos intervalos (`hourIni` e `hourFin`), histórico com expansão de detalhes. | 1. Horários no formato `HH:MM`.<br>2. `hourFin > hourIni` obrigatório.<br>3. Intervalos do mesmo dia não podem se sobrepor.<br>4. O total de horas diário é calculado automaticamente. |
+| **Clientes** | Listagem com busca, cadastro, edição e exclusão. | 1. O campo `ein` (CNPJ/identificador) deve ter de 2 a 14 caracteres e é único no sistema.<br>2. Criação, edição e exclusão restritas a `ADMIN` (colaboradores apenas visualizam). |
+| **Projetos** | Listagem, filtros por status e cliente, cadastro com preço e tipo (`ABERTO` / `FECHADO`). | 1. O título do projeto não pode ser repetido para o mesmo cliente.<br>2. Criação, edição e exclusão restritas a `ADMIN` (colaboradores apenas visualizam). |
+| **Lançamento de Horas** | Calendário / Timesheet diário, construtor de múltiplos intervalos (`hourIni` e `hourFin`), histórico com expansão de detalhes. | 1. Horários no formato `HH:MM`.<br>2. `hourFin > hourIni` obrigatório (`hourFin` aceita até `24:00`).<br>3. Intervalos contíguos são válidos; sobreposições não permitidas.<br>4. O total de horas diário é calculado automaticamente.<br>5. O usuário só pode editar e excluir seus próprios apontamentos (`ADMIN` pode alterar qualquer um).<br>6. O `userId` vem do token JWT (não enviar no body). |
 | **Usuários** (Admin) | Gestão de colaboradores (Nome, E-mail, Senha, Role, Status). | Apenas usuários com `role: "ADMIN"` podem acessar essa seção. |
 | **Dashboard** | Cards com métricas de horas na semana/mês, horas por projeto e gráficos visuais. | Resumos visuais para rápida tomada de decisão. |
 
@@ -209,7 +209,8 @@ Copie e envie cada prompt abaixo na sequência para a sua IA (Antigravity, Curso
 > 4. Crie `TimeEntriesPage.tsx`:
 >    - Tabela listando os apontamentos por data, projeto, total de horas registradas e descrição.
 >    - Linhas expansíveis (Accordion) mostrando a lista detalhada de sub-intervalos daquele dia (`09:00 - 12:00 (3h)`, `13:00 - 18:00 (5h)`).
->    - Ações para editar e excluir o lançamento diário."
+>    - Ações para editar e excluir o lançamento diário (apenas habilitadas se o apontamento for do usuário logado ou se o usuário for ADMIN).
+>    - Atenção: o frontend não deve enviar o campo user no POST/PUT; o backend associa pelo token JWT."
 
 ---
 

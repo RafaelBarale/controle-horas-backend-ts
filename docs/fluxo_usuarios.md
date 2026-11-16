@@ -9,8 +9,9 @@ Este documento descreve detalhadamente a arquitetura, os fluxos de requisição 
 | Camada / Arquivo | Responsabilidade |
 | :--- | :--- |
 | `src/app.ts` | Registra o prefixo `/users`, aplicando o middleware global de autenticação `authenticate` antes de repassar para o roteador. |
-| `src/routes/userRoutes.ts` | Declara as rotas de usuários (`POST /`, `GET /`, `GET /:userId`, `PUT /:userId`, `DELETE /:userId`) e vincula os validadores e métodos do controller. |
+| `src/routes/userRoutes.ts` | Declara as rotas de usuários (`POST /`, `GET /`, `GET /:id`, `PUT /:id`, `DELETE /:id`) e vincula os validadores e métodos do controller. Protege rotas mutativas com `authorize('ADMIN')`. |
 | `src/middlewares/authenticate.ts` | Valida o JWT (`accessToken`) no cabeçalho `Authorization: Bearer <token>` e injeta `req.user`. |
+| `src/middlewares/authorize.ts` | Restringe a execução dos endpoints de criação, edição e exclusão de usuários exclusivamente para usuários com perfil `ADMIN`. |
 | `src/middlewares/validateRequest.ts` | Intercepta requisições e valida `body`, `params` e `query` com schemas Zod antes de chegar ao controller. |
 | `src/schemas/user.schema.ts` | Define os schemas Zod de criação (`createUserSchema`), atualização (`updateUserSchema`) e consulta (`getUserSchema`). |
 | `src/schemas/id.schema.ts` | Valida e faz coerção de parâmetros de identificador (`userId` inteiro e positivo). |
@@ -303,6 +304,7 @@ Isso assegura em tempo de compilação e execução que a hash da senha nunca se
 | `201 Created` | Usuário registrado com sucesso. | Objeto `UserSummary` recém-criado. |
 | `400 Bad Request` | Falha na validação de dados de entrada Zod ou regra de e-mail duplicado. | `"Este e-mail ja esta em uso."` ou lista de erros de schema. |
 | `401 Unauthorized` | Token de autenticação ausente, corrompido ou expirado. | `"Token missing"` / `"Token expired"` / `"Invalid token"`. |
+| `403 Forbidden` | Usuário autenticado sem perfil `ADMIN` tentando criar, atualizar ou excluir usuários. | `"Usuário não autorizado."` |
 | `404 Not Found` | O `userId` informado não corresponde a nenhum registro existente. | `"Usuário não encontrado."` |
 | `500 Internal Server Error` | Erros inesperados de infraestrutura ou banco de dados. | `"Internal Server Error"`. |
 
@@ -311,6 +313,7 @@ Isso assegura em tempo de compilação e execução que a hash da senha nunca se
 ## 9. Boas Práticas Adotadas
 
 * **Proteção Global da Rota:** Todas as rotas filhas de `/users` são protegidas pelo middleware `authenticate` em `app.ts`.
+* **Controle de Acesso com `authorize('ADMIN')`:** Endpoints de criação (`POST`), atualização (`PUT`) e exclusão (`DELETE`) são estritamente restritos a usuários com a role `ADMIN`.
 * **Validação de Entrada com Zod:** Parâmetros de rota (`params`) e corpo (`body`) são rigorosamente validados e tipados antes de qualquer operação de banco.
 * **Segurança de Senhas:** Criptografia irreversível com `bcrypt` (10 rounds de salt) no cadastro.
 * **Prevenção de Vazamento de Credenciais:** Assegurada no nível da camada de repositório (`omit: { password: true }`), tornando impossível o retorno da senha para as camadas superiores.

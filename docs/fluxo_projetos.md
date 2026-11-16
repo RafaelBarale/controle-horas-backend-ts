@@ -9,8 +9,9 @@ Este documento descreve detalhadamente a arquitetura, os fluxos de requisição 
 | Camada / Arquivo | Responsabilidade |
 | :--- | :--- |
 | `src/app.ts` | Registra o prefixo `/projects`, aplicando o middleware global de autenticação `authenticate` antes de repassar para o roteador. |
-| `src/routes/projectRoutes.ts` | Declara as rotas de projetos (`POST /`, `GET /`, `GET /:id`, `PUT /:id`, `DELETE /:id`) e vincula os validadores e métodos do controller. |
+| `src/routes/projectRoutes.ts` | Declara as rotas de projetos (`POST /`, `GET /`, `GET /:id`, `PUT /:id`, `DELETE /:id`) e vincula os validadores e métodos do controller. Protege rotas mutativas com `authorize('ADMIN')`. |
 | `src/middlewares/authenticate.ts` | Valida o JWT (`accessToken`) no cabeçalho `Authorization: Bearer <token>` e injeta `req.user`. |
+| `src/middlewares/authorize.ts` | Restringe a execução dos endpoints de criação, edição e exclusão de projetos exclusivamente para usuários com perfil `ADMIN`. |
 | `src/middlewares/validateRequest.ts` | Intercepta requisições e valida `body`, `params` e `query` com schemas Zod antes de chegar ao controller. |
 | `src/schemas/project.schema.ts` | Define os schemas Zod de criação (`createProjectSchema`), atualização (`updateProjectSchema`) e consulta (`getProjectSchema`). |
 | `src/schemas/id.schema.ts` | Valida e faz coerção de parâmetros de identificador (`id` inteiro e positivo). |
@@ -368,6 +369,7 @@ export const createProjectSchema = z.object({
 | `201 Created` | Projeto registrado com sucesso. | Objeto `Projects` recém-criado. |
 | `400 Bad Request` | Falha de validação Zod (título curto, preço inválido), ID do cliente ausente ou título duplicado para o cliente. | `"O ID do cliente é obrigatório para criar um projeto."` ou `"Projeto já existe para este cliente."` |
 | `401 Unauthorized` | Token de autenticação ausente, corrompido ou expirado. | `"Token missing"` / `"Token expired"` / `"Invalid token"`. |
+| `403 Forbidden` | Usuário autenticado sem perfil `ADMIN` tentando criar, atualizar ou excluir projetos. | `"Usuário não autorizado."` |
 | `404 Not Found` | O `id` do projeto ou o `clientId` informado não foi localizado. | `"Projeto nao encontrado."` ou `"Cliente nao encontrado."` |
 | `500 Internal Server Error` | Erros inesperados de infraestrutura ou banco de dados. | `"Internal Server Error"`. |
 
@@ -376,6 +378,7 @@ export const createProjectSchema = z.object({
 ## 9. Boas Práticas Adotadas
 
 * **Proteção Global da Rota:** Todas as rotas filhas de `/projects` exigem autenticação JWT ativa através do middleware `authenticate` em `app.ts`.
+* **Controle de Acesso com `authorize('ADMIN')`:** Rotas de criação (`POST`), atualização (`PUT`) e exclusão (`DELETE`) são estritamente restritas a administradores do sistema.
 * **Validação Rigorosa de Entrada:** Schemas Zod asseguram que os tipos de dados e restrições (ex: tamanho mínimo do título, valores positivos) sejam validados antes da execução dos controllers.
 * **Integridade Referencial em Nível de Serviço:** O serviço valida ativamente a existência do cliente vinculado (`clientRepository.findById`) antes de criar ou atualizar o projeto, retornando `404 Not Found` em vez de falhas genéricas de banco.
 * **Regra de Unicidade por Escopo:** A unicidade do título do projeto é contextualizada pelo cliente (`title + clientId`), permitindo que clientes distintos tenham projetos com nomes idênticos sem conflitos.

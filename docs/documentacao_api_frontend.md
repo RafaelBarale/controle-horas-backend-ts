@@ -427,12 +427,11 @@ Este mÃ³dulo gerencia o cabeÃ§alho do apontamento diÃ¡rio e seus respectiv
 ### 8.1 Criar Apontamento de Horas com Intervalos
 `POST /time`
 * **Request Body:**
-  | Campo | Tipo | ObrigatÃ³rio? | DescriÃ§Ã£o / Regra |
+  | Campo | Tipo | Obrigatório? | Descrição / Regra |
   | :--- | :--- | :--- | :--- |
   | `date` | `string` | Sim | Data no formato `"AAAA-MM-DD"` |
-  | `description` | `string \| null` | NÃ£o | Detalhes das tarefas realizadas |
+  | `description` | `string \| null` | Não | Detalhes das tarefas realizadas |
   | `project.projectId` | `number` | Sim | ID do projeto existente |
-  | `user.userId` | `number` | Sim | ID do usuÃ¡rio existente |
   | `subTimeEntries` | `Array<Interval>`| Sim | Pelo menos 1 intervalo (`min: 1`) |
   | `subTimeEntries[].hourIni` | `string` | Sim | Hora inicial (`"HH:MM"`) |
   | `subTimeEntries[].hourFin` | `string` | Sim | Hora final (`"HH:MM"`), maior que `hourIni` |
@@ -440,12 +439,9 @@ Este mÃ³dulo gerencia o cabeÃ§alho do apontamento diÃ¡rio e seus respectiv
   ```json
   {
     "date": "2026-11-11",
-    "description": "ImplementaÃ§Ã£o das telas de dashboard e autenticaÃ§Ã£o",
+    "description": "Implementação das telas de dashboard e autenticação",
     "project": {
       "projectId": 1
-    },
-    "user": {
-      "userId": 1
     },
     "subTimeEntries": [
       {
@@ -533,12 +529,13 @@ Retorna todos os lanÃ§amentos trazendo embutido o array `timeSubEntries` de ca
 
 ### 8.4 Atualizar Apontamento e Substituir Intervalos
 `PUT /time/:id`
+* **Controle de Acesso / Ownership:** Apenas o **próprio usuário criador** do lançamento ou um usuário com perfil `ADMIN` pode atualizá-lo. Usuários tentando atualizar apontamentos de terceiros recebem `403 Forbidden` (`"Você não tem permissão para editar este lançamento."`).
 * **Comportamento dos Intervalos:** Caso `subTimeEntries` seja enviado, o backend substitui atomicamente todos os intervalos anteriores pelos novos e recalcula o `totalTime`.
 * **Request Body:**
   ```json
   {
     "date": "2026-11-11",
-    "description": "DescriÃ§Ã£o corrigida",
+    "description": "Descrição corrigida",
     "subTimeEntries": [
       {
         "hourIni": "09:00",
@@ -551,13 +548,14 @@ Retorna todos os lanÃ§amentos trazendo embutido o array `timeSubEntries` de ca
     ]
   }
   ```
-* **Resposta de Sucesso (`200 OK`):** Retorna o lanÃ§amento atualizado com o novo `totalTime: 8` recalculado.
+* **Resposta de Sucesso (`200 OK`):** Retorna o lançamento atualizado com o novo `totalTime: 8` recalculado.
 
 ---
 
 ### 8.5 Deletar Apontamento
 `DELETE /time/:id`
-* **Efeito Cascata:** Exclui o lanÃ§amento pai e todos os seus `SubTimeEntries` vinculados no banco de dados.
+* **Controle de Acesso / Ownership:** Apenas o **próprio usuário criador** do lançamento ou um usuário com perfil `ADMIN` pode excluí-lo. Usuários tentando excluir apontamentos de terceiros recebem `403 Forbidden` (`"Você não tem permissão para excluir este lançamento."`).
+* **Efeito Cascata:** Exclui o lançamento pai e todos os seus `SubTimeEntries` vinculados no banco de dados.
 * **Resposta de Sucesso (`200 OK`):** Retorna o registro removido.
 
 ---
@@ -860,6 +858,7 @@ api.interceptors.response.use(
 ### Atualizações adicionais
 
 - **TimeEntry (`/time`)**: o `userId` **não** deve ser enviado no corpo da requisição. Ele é extraído do token JWT pelo middleware `authenticate` e passado ao serviço (`request.user?.id`).
+- **Ownership em TimeEntry (`/time/:id`)**: no `PUT` e `DELETE`, apenas o próprio autor do lançamento ou um usuário com perfil `ADMIN` tem permissão para alterar ou excluir o registro (retorna `403 Forbidden` se não autorizado).
 - **Regras de intervalo**: períodos contíguos são permitidos (ex.: `09:00‑12:00` + `12:00‑13:00`). O campo `hourFin` aceita o valor `24:00`. Horários que atravessam a meia‑noite devem ser divididos em duas entradas.
-- **Autorização**: rotas de criação, atualização e exclusão de **clientes** e **projetos** (`POST`, `PUT`, `DELETE`) exigem role `ADMIN`. As rotas de listagem (`GET`) são acessíveis a qualquer usuário autenticado.
+- **Autorização Geral**: rotas de criação, atualização e exclusão de **usuários**, **clientes** e **projetos** (`POST`, `PUT`, `DELETE`) exigem role `ADMIN`. As rotas de listagem (`GET`) e leitura individual são acessíveis a qualquer usuário autenticado.
 - **Interceptor Axios**: já inclui o padrão de fila (`request‑queue`) que garante que apenas uma chamada ao endpoint `/auth/refresh` seja disparada quando o `accessToken` expira, evitando condições de corrida.
