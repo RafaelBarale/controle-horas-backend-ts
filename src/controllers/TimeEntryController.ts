@@ -33,7 +33,12 @@ export class TimeEntryController {
     try {
       const parsedParams = getByIdParamsSchema.parse(request.params);
       const dataBody = request.body;
-      const project = await this.timeService.update(parsedParams.id, dataBody);
+      const userId = Number(request.user?.id);
+
+      if (!userId) {
+        throw new AppError('Usuário não autenticado.', 401);
+      }
+      const project = await this.timeService.update(parsedParams.id, dataBody, userId, request.user?.role);
       response.status(200).json(project);
     } catch (error: any) {
       next(error);
@@ -53,7 +58,13 @@ export class TimeEntryController {
   async delete(request: Request, response: Response, next: NextFunction): Promise<void> {
     try {
       const parsedParams = getByIdParamsSchema.parse(request.params);
-      const project = await this.timeService.delete(parsedParams.id);
+      const userId = Number(request.user?.id);
+
+      if (!userId) {
+        throw new AppError('Usuário não autenticado.', 401);
+      }
+
+      const project = await this.timeService.delete(parsedParams.id, userId, request.user?.role);
       response.status(200).json(project);
     } catch (error: any) {
       next(error);

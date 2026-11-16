@@ -56,10 +56,6 @@ export class UserService {
       throw new AppError('Invalid or user inactive', 401);
     }
 
-    if (!user) {
-      throw new AppError('Usuário não encontrado.', 404);
-    }
-
     return user;
   }
 

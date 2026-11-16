@@ -26,8 +26,13 @@ export class TimeEntryService {
     return this.getTimeOrThrow(timeEntrieId);
   }
 
-  async delete(timeEntrieId: number): Promise<TimeEntries> {
-    await this.getTimeOrThrow(timeEntrieId);
+  async delete(timeEntrieId: number, userId: number, role: string | undefined): Promise<TimeEntries> {
+    const entry = await this.getTimeOrThrow(timeEntrieId);
+    // Verifica se o lançamento pertence ao usuário logado
+    if (entry.userId !== userId && role !== 'ADMIN') {
+      throw new AppError('Você não tem permissão para excluir este lançamento.', 403);
+    }
+
     return this.TimeEntryRepository.delete(timeEntrieId);
   }
 
@@ -75,11 +80,16 @@ export class TimeEntryService {
     return this.TimeEntryRepository.create(dataCreate);
   }
 
-  async update(timeEntrieId: number, data: UpdateTimeEntryBody): Promise<TimeEntries> {
+  async update(timeEntrieId: number, data: UpdateTimeEntryBody, userId: number, role: string | undefined): Promise<TimeEntries> {
     const existingTime = await this.getTimeOrThrow(timeEntrieId);
     const { project, date, subTimeEntries, ...resdata } = data;
     const targetProjectId = project?.projectId ?? existingTime.projectId;
     const targetUserId = existingTime.userId;
+
+    // Verifica se o lançamento pertence ao usuário logado
+    if (existingTime.userId !== userId && role !== 'ADMIN') {
+      throw new AppError('Você não tem permissão para editar este lançamento.', 403);
+    }
 
     // Valida os intervalos antes de qualquer consulta ao banco
     const intervals = subTimeEntries ? this.buildIntervals(subTimeEntries) : null;
